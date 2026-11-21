@@ -231,7 +231,9 @@
         const dx = from.left - to.left;
         const dy = from.top - to.top;
         if (dx || dy) {
-          c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 450, easing: ease });
+          // Léger délai : les cartes qui partent ont disparu avant que celle-ci ne glisse
+          c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+            { duration: 400, delay: leaving.length ? 110 : 0, easing: ease, fill: 'backwards' });
         }
       });
 
@@ -249,14 +251,14 @@
         });
         gridEl.appendChild(ghost);
         ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.9)' }],
-          { duration: 250, easing: 'ease-in', fill: 'forwards' }).onfinish = () => ghost.remove();
-        setTimeout(() => ghost.remove(), 400); // sécurité si l'animation est suspendue
+          { duration: 120, easing: 'ease-in', fill: 'forwards' }).onfinish = () => ghost.remove();
+        setTimeout(() => ghost.remove(), 250); // sécurité si l'animation est suspendue
       });
 
       // Cartes qui arrivent : apparition en douceur
       entering.forEach((c, k) => {
         c.animate([{ opacity: 0, transform: 'scale(0.9)' }, { opacity: 1, transform: 'none' }],
-          { duration: 350, delay: 120 + k * 40, easing: ease, fill: 'backwards' });
+          { duration: 350, delay: 180 + k * 40, easing: ease, fill: 'backwards' });
       });
     }
 
