@@ -95,7 +95,7 @@
     const img = p.thumbnail || p.banner;
     const first = String(L(p.pitch) || '').split(/\n\s*\n/)[0];
     return `
-      <a class="card" href="#/projects/${encodeURIComponent(p.slug)}">
+      <a class="card" href="#/projects/${encodeURIComponent(p.slug)}" data-slug="${esc(p.slug)}">
         <div class="card-media">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : ''}</div>
         <div class="card-body">
           <h3 class="card-title">${esc(L(p.title))}</h3>
@@ -198,7 +198,69 @@
     const resetEl = $('#reset');
     const resultsEl = $('#results');
 
-    function update() {
+    // Toutes les cartes sont créées une seule fois ; les filtres les masquent / affichent
+    resultsEl.innerHTML = `
+      <div class="grid" id="grid">${PROJECTS.map(cardHTML).join('')}</div>
+      <div class="empty" id="empty" hidden><p>${esc(t('projects.empty'))}</p>
+        <button type="button" class="btn" data-reset>${esc(t('filters.reset'))}</button></div>`;
+    const gridEl = $('#grid', resultsEl);
+    const emptyEl = $('#empty', resultsEl);
+    const cards = $$('.card', gridEl);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // Animation "FLIP" : les cartes glissent vers leur nouvelle place,
+    // celles qui disparaissent s'estompent, celles qui arrivent apparaissent.
+    function applyVisibility(visible, animate) {
+      const canAnimate = animate && !reduceMotion.matches && typeof Element.prototype.animate === 'function';
+      $$('.card-ghost', gridEl).forEach(g => g.remove()); // clics rapides : on nettoie
+      const first = new Map();
+      if (canAnimate) cards.forEach(c => { if (!c.hidden) first.set(c, c.getBoundingClientRect()); });
+
+      const leaving = cards.filter(c => !c.hidden && !visible.has(c.dataset.slug));
+      const entering = cards.filter(c => c.hidden && visible.has(c.dataset.slug));
+      cards.forEach(c => { c.hidden = !visible.has(c.dataset.slug); });
+      if (!canAnimate) return;
+
+      const ease = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+      const gridRect = gridEl.getBoundingClientRect();
+
+      // Cartes qui restent : glissement de l'ancienne à la nouvelle position
+      first.forEach((from, c) => {
+        if (c.hidden) return;
+        const to = c.getBoundingClientRect();
+        const dx = from.left - to.left;
+        const dy = from.top - to.top;
+        if (dx || dy) {
+          c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 450, easing: ease });
+        }
+      });
+
+      // Cartes qui partent : un "fantôme" s'estompe à l'ancienne place
+      leaving.forEach(c => {
+        const from = first.get(c);
+        const ghost = c.cloneNode(true);
+        ghost.hidden = false;
+        ghost.removeAttribute('href');
+        ghost.setAttribute('aria-hidden', 'true');
+        ghost.classList.add('card-ghost');
+        Object.assign(ghost.style, {
+          left: `${from.left - gridRect.left}px`, top: `${from.top - gridRect.top}px`,
+          width: `${from.width}px`, height: `${from.height}px`
+        });
+        gridEl.appendChild(ghost);
+        ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.9)' }],
+          { duration: 250, easing: 'ease-in', fill: 'forwards' }).onfinish = () => ghost.remove();
+        setTimeout(() => ghost.remove(), 400); // sécurité si l'animation est suspendue
+      });
+
+      // Cartes qui arrivent : apparition en douceur
+      entering.forEach((c, k) => {
+        c.animate([{ opacity: 0, transform: 'scale(0.9)' }, { opacity: 1, transform: 'none' }],
+          { duration: 350, delay: 120 + k * 40, easing: ease, fill: 'backwards' });
+      });
+    }
+
+    function update(animate = true) {
       const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest('.chip');
       const focusKey = focused ? focused.dataset.group + '|' + focused.dataset.value : null;
 
@@ -221,10 +283,8 @@
       const active = Object.values(state).some(s => s.size);
       countEl.textContent = plural('projects.count', list.length);
       resetEl.hidden = !active;
-      resultsEl.innerHTML = list.length
-        ? `<div class="grid">${list.map(cardHTML).join('')}</div>`
-        : `<div class="empty"><p>${esc(t('projects.empty'))}</p>
-             <button type="button" class="btn" data-reset>${esc(t('filters.reset'))}</button></div>`;
+      applyVisibility(new Set(list.map(p => p.slug)), animate);
+      emptyEl.hidden = list.length > 0;
 
       // Les filtres actifs sont gardés dans l'adresse (lien partageable)
       const q = new URLSearchParams();
@@ -251,7 +311,7 @@
     resetEl.addEventListener('click', reset);
     resultsEl.addEventListener('click', e => { if (e.target.closest('[data-reset]')) reset(); });
 
-    update();
+    update(false);
   }
 
   /* ---------- Page d'un projet ---------- */
