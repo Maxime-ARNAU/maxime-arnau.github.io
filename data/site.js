@@ -9,7 +9,7 @@ window.SITE = {
     title: 'Gameplay Programmer',
     photo: 'assets/img/photo.jpg',
     email: 'maxime.arnau@outlook.fr',
-    linkedin: '', // ← collez ici l'adresse complète de votre profil LinkedIn
+    linkedin: 'https://www.linkedin.com/in/maxime-arnau-2029b333b',
 
     status: {
       fr: 'À la recherche d’un stage ou d’un poste',
